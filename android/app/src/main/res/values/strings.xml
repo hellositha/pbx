@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">ECLYPE TECH</string>
+    <string name="app_subtitle">Enterprise VoIP PBX &amp; Unified Communications</string>
+    <string name="loading">Loading ECLYPE TECH PBX...</string>
+    <string name="error_network_title">Connection Lost</string>
+    <string name="error_network_message">Unable to connect to the PBX server. Please verify your network connection and server settings.</string>
+    <string name="btn_retry">Retry Connection</string>
+    <string name="btn_settings">Server Settings</string>
+    <string name="dialog_server_title">PBX Server Configuration</string>
+    <string name="dialog_server_hint">http://49.156.43.92 or https://your-pbx.com</string>
+    <string name="btn_save">Save &amp; Connect</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="permission_rationale">ECLYPE TECH requires Microphone and Audio permissions to make and receive enterprise VoIP calls.</string>
+</resources>

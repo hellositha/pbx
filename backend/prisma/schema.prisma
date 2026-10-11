@@ -1,0 +1,503 @@
+// ECLYPETECH PBX - Prisma Database Schema
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// Enums
+// ----------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  PBX_ADMIN
+  DEPT_MANAGER
+  QUEUE_SUPERVISOR
+  RECEPTIONIST
+  STANDARD_USER
+  AUDITOR
+}
+
+enum OutboundClass {
+  INTERNAL
+  LOCAL
+  DOMESTIC
+  INTERNATIONAL
+  UNRESTRICTED
+}
+
+enum RecordPolicy {
+  ALWAYS
+  INBOUND_ONLY
+  OUTBOUND_ONLY
+  NEVER
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  RINGING
+  ON_CALL
+}
+
+enum TrunkTransport {
+  UDP
+  TCP
+  TLS
+}
+
+enum TrunkAuthMode {
+  REGISTRATION
+  IP_BASED
+}
+
+enum TrunkStatus {
+  REGISTERED
+  UNREGISTERED
+  FAILED
+  DISABLED
+  UNKNOWN
+}
+
+enum TrunkType {
+  SIP_TRUNK
+  GATEWAY
+  SBC
+  BRIDGE
+}
+
+enum DestinationType {
+  EXTENSION
+  RING_GROUP
+  IVR
+  QUEUE
+  VOICEMAIL
+  EXTERNAL
+}
+
+enum RingStrategy {
+  SIMULTANEOUS
+  SEQUENTIAL
+  ROUND_ROBIN
+  RANDOM
+}
+
+enum QueueStrategy {
+  LONGEST_IDLE_AGENT
+  ROUND_ROBIN
+  RING_ALL
+}
+
+enum AgentStatus {
+  LOGGED_IN
+  LOGGED_OUT
+  ON_CALL
+  PAUSED
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum CallDisposition {
+  ANSWERED
+  NO_ANSWER
+  BUSY
+  FAILED
+}
+
+enum BackupStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum SecurityEventType {
+  FAILED_SIP_REGISTRATION
+  BRUTE_FORCE_LOGIN
+  TOLL_FRAUD_SPIKE
+  UNAUTHORIZED_TRUNK_ACCESS
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ----------------------------------------------------
+// Models
+// ----------------------------------------------------
+
+model User {
+  id                  String       @id @default(uuid())
+  username            String       @unique
+  email               String       @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  role                Role         @default(STANDARD_USER)
+  departmentId        String?
+  department          Department?  @relation(fields: [departmentId], references: [id])
+  isActive            Boolean      @default(true)
+  mfaEnabled          Boolean      @default(false)
+  mfaSecret           String?
+  failedLoginAttempts Int          @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  extension           Extension?
+  auditLogs           AuditLog[]
+
+  @@index([role])
+  @@index([departmentId])
+}
+
+model Department {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  code        String       @unique
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users       User[]
+  extensions  Extension[]
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  username   String
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  ipAddress  String
+  createdAt  DateTime @default(now())
+
+  @@index([resource, action])
+  @@index([createdAt])
+}
+
+model Extension {
+  id                   String        @id @default(uuid())
+  extensionNumber      String        @unique
+  displayName          String
+  userId               String?       @unique
+  user                 User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  departmentId         String?
+  department           Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  sipPasswordHash      String
+  sipPasswordEncrypted String
+  enabled              Boolean       @default(true)
+  callWaiting          Boolean       @default(true)
+  maxCalls             Int           @default(2)
+  outboundClass        OutboundClass @default(LOCAL)
+  dnd                  Boolean       @default(false)
+  forwardAlways        String?
+  forwardBusy          String?
+  forwardNoAnswer      String?
+  noAnswerTimeout      Int           @default(25)
+  recordCalls          RecordPolicy  @default(NEVER)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  devices              ExtensionDevice[]
+  voicemailBox         VoicemailBox?
+  ringGroupMembers     RingGroupMember[]
+  queueAgents          QueueAgent[]
+
+  @@index([enabled])
+}
+
+model ExtensionDevice {
+  id           String       @id @default(uuid())
+  extensionId  String
+  extension    Extension    @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  deviceType   String       @default("SIP")
+  userAgent    String?
+  ipAddress    String?
+  port         Int?
+  status       DeviceStatus @default(OFFLINE)
+  registeredAt DateTime?
+  expiresAt    DateTime?
+
+  @@index([extensionId])
+}
+
+model VoicemailBox {
+  id                String    @id @default(uuid())
+  extensionId       String    @unique
+  extension         Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  mailbox           String    @unique
+  pin               String
+  emailNotification String?
+  attachAudio       Boolean   @default(false)
+  greetingFile      String?
+  messageCount      Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model SipTrunk {
+  id                   String         @id @default(uuid())
+  name                 String         @unique
+  provider             String
+  trunkType            TrunkType      @default(SIP_TRUNK)
+  description          String?
+  serverAddress        String
+  serverPort           Int            @default(5060)
+  transport            TrunkTransport @default(UDP)
+  authMode             TrunkAuthMode  @default(REGISTRATION)
+  authUsername         String?
+  authPasswordEncrypted String?
+  outboundCallerId     String?
+  callerIdName         String?
+  registerExpires      Int            @default(3600)
+  maxConcurrent        Int            @default(10)
+  enabled              Boolean        @default(true)
+  isPrimary            Boolean        @default(false)
+  status               TrunkStatus    @default(UNKNOWN)
+  outboundProxy        String?
+  fromUser             String?
+  fromDomain           String?
+  mediaEncryption      String         @default("DISABLED")
+  natTraversal         String         @default("AUTO")
+  inboundDids          String?
+  activeCalls          Int            @default(0)
+  lastRegisteredAt     DateTime?
+  lastSuccessAt        DateTime?
+  lastFailureAt        DateTime?
+  sipResponseCode      String?
+  lastError            String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  inboundRoutes        InboundRoute[]
+  primaryOutbound      OutboundRoute[] @relation("PrimaryTrunk")
+  failoverOutbound     OutboundRoute[] @relation("FailoverTrunk")
+  callRecords          CallRecord[]
+}
+
+model InboundRoute {
+  id                     String          @id @default(uuid())
+  name                   String
+  didNumber              String
+  trunkId                String?
+  trunk                  SipTrunk?       @relation(fields: [trunkId], references: [id], onDelete: SetNull)
+  timeConditionEnabled   Boolean         @default(false)
+  businessHoursStart     String?         // "09:00"
+  businessHoursEnd       String?         // "17:00"
+  businessDays           String?         // "MON,TUE,WED,THU,FRI"
+  destinationType        DestinationType
+  destinationTarget      String
+  afterHoursDestinationType DestinationType?
+  afterHoursTarget       String?
+  recordCalls            Boolean         @default(false)
+  priority               Int             @default(10)
+  enabled                Boolean         @default(true)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  @@index([didNumber])
+  @@index([enabled])
+}
+
+model OutboundRoute {
+  id              String        @id @default(uuid())
+  name            String
+  dialPattern     String
+  stripDigits     Int           @default(0)
+  prependDigits   String?
+  primaryTrunkId  String
+  primaryTrunk    SipTrunk      @relation("PrimaryTrunk", fields: [primaryTrunkId], references: [id], onDelete: Restrict)
+  failoverTrunkId String?
+  failoverTrunk   SipTrunk?     @relation("FailoverTrunk", fields: [failoverTrunkId], references: [id], onDelete: SetNull)
+  allowedClass    OutboundClass @default(LOCAL)
+  customCallerId  String?
+  maxCallDuration Int?
+  priority        Int           @default(10)
+  enabled         Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([priority])
+  @@index([enabled])
+}
+
+model IvrMenu {
+  id              String          @id @default(uuid())
+  name            String
+  extensionNumber String          @unique
+  audioPromptFile String
+  timeout         Int             @default(5)
+  maxAttempts     Int             @default(3)
+  timeoutDestType DestinationType @default(VOICEMAIL)
+  timeoutTarget   String          @default("1000")
+  invalidDestType DestinationType @default(VOICEMAIL)
+  invalidTarget   String          @default("1000")
+  enabled         Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  options         IvrOption[]
+}
+
+model IvrOption {
+  id                String          @id @default(uuid())
+  ivrMenuId         String
+  ivrMenu           IvrMenu         @relation(fields: [ivrMenuId], references: [id], onDelete: Cascade)
+  digit             String          // "1", "2", "*", "0"
+  destinationType   DestinationType
+  destinationTarget String
+  description       String?
+  createdAt         DateTime        @default(now())
+
+  @@unique([ivrMenuId, digit])
+}
+
+model RingGroup {
+  id               String          @id @default(uuid())
+  groupNumber      String          @unique
+  name             String
+  strategy         RingStrategy    @default(SIMULTANEOUS)
+  ringTimeout      Int             @default(20)
+  fallbackDestType DestinationType @default(VOICEMAIL)
+  fallbackTarget   String          @default("1000")
+  enabled          Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  members          RingGroupMember[]
+}
+
+model RingGroupMember {
+  id          String    @id @default(uuid())
+  ringGroupId String
+  ringGroup   RingGroup @relation(fields: [ringGroupId], references: [id], onDelete: Cascade)
+  extensionId String
+  extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  priority    Int       @default(1)
+
+  @@unique([ringGroupId, extensionId])
+}
+
+model CallQueue {
+  id               String          @id @default(uuid())
+  queueNumber      String          @unique
+  name             String
+  strategy         QueueStrategy   @default(LONGEST_IDLE_AGENT)
+  maxWaitTime      Int             @default(300)
+  maxQueueSize     Int             @default(20)
+  musicOnHold      String          @default("local_stream://moh")
+  wrapUpTime       Int             @default(15)
+  overflowDestType DestinationType @default(VOICEMAIL)
+  overflowTarget   String          @default("1000")
+  enabled          Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  agents           QueueAgent[]
+}
+
+model QueueAgent {
+  id          String      @id @default(uuid())
+  callQueueId String
+  callQueue   CallQueue   @relation(fields: [callQueueId], references: [id], onDelete: Cascade)
+  extensionId String
+  extension   Extension   @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  tier        Int         @default(1)
+  status      AgentStatus @default(LOGGED_OUT)
+
+  @@unique([callQueueId, extensionId])
+}
+
+model CallRecord {
+  id              String          @id @default(uuid())
+  callUuid        String          @unique
+  direction       CallDirection
+  callerIdNum     String
+  callerIdName    String?
+  destination     String
+  sourceExtension String?
+  destExtension   String?
+  trunkId         String?
+  trunk           SipTrunk?       @relation(fields: [trunkId], references: [id], onDelete: SetNull)
+  disposition     CallDisposition
+  startTime       DateTime
+  answerTime      DateTime?
+  endTime         DateTime
+  duration        Int             @default(0)
+  billsec         Int             @default(0)
+  hangupCause     String
+  hasRecording    Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+
+  recording       CallRecording?
+
+  @@index([startTime])
+  @@index([sourceExtension])
+  @@index([destExtension])
+  @@index([destination])
+  @@index([disposition])
+}
+
+model CallRecording {
+  id           String     @id @default(uuid())
+  callRecordId String     @unique
+  callRecord   CallRecord @relation(fields: [callRecordId], references: [id], onDelete: Cascade)
+  filePath     String
+  fileSize     BigInt
+  duration     Int
+  format       String     @default("wav")
+  expiresAt    DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([createdAt])
+}
+
+model SystemSetting {
+  key         String   @id
+  value       String
+  category    String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model BackupJob {
+  id                 String       @id @default(uuid())
+  filename           String
+  filePath           String
+  fileSize           BigInt
+  includesRecordings Boolean      @default(false)
+  status             BackupStatus @default(SUCCESS)
+  checksum           String
+  createdAt          DateTime     @default(now())
+
+  @@index([createdAt])
+}
+
+model SecurityEvent {
+  id        String            @id @default(uuid())
+  eventType SecurityEventType
+  severity  Severity          @default(MEDIUM)
+  sourceIp  String
+  details   Json
+  resolved  Boolean           @default(false)
+  createdAt DateTime          @default(now())
+
+  @@index([eventType])
+  @@index([sourceIp])
+  @@index([createdAt])
+}

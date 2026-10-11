@@ -1,0 +1,19 @@
+[Unit]
+Description=ECLYPETECH PBX REST API & Telephony Control Daemon
+After=network.target postgresql.service asterisk.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/pbx/backend
+ExecStart=/usr/bin/node /root/pbx/backend/dist/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=4000
+EnvironmentFile=-/root/pbx/backend/.env
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

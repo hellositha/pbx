@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <!-- Rounded Background Square with gradient look -->
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M16,0 L80,0 A16,16 0 0,1 96,16 L96,80 A16,16 0 0,1 80,96 L16,96 A16,16 0 0,1 0,80 L0,16 A16,16 0 0,1 16,0 Z" />
+    <!-- Inner Accent Glow -->
+    <path
+        android:fillColor="#0369A1"
+        android:pathData="M48,8 L88,48 L48,88 L8,48 Z" />
+    <!-- Telephony / Call Waves -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M32,48 C32,39.16 39.16,32 48,32 C56.84,32 64,39.16 64,48" />
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M24,48 C24,34.75 34.75,24 48,24 C61.25,24 72,34.75 72,48" />
+    <!-- Central Softphone / Headset / Core Icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,44 C42.48,44 38,48.48 38,54 C38,58.33 40.75,62.01 44.62,63.42 L44.62,68 C44.62,69.1 45.52,70 46.62,70 L49.38,70 C50.48,70 51.38,69.1 51.38,68 L51.38,63.42 C55.25,62.01 58,58.33 58,54 C58,48.48 53.52,44 48,44 Z" />
+</vector>

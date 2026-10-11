@@ -1,0 +1,18 @@
+[Unit]
+Description=ECLYPETECH PBX Next.js Enterprise Console
+After=network.target eclypetech-backend.service
+Wants=eclypetech-backend.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/pbx/frontend
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3000
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
